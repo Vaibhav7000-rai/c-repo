@@ -1,10 +1,295 @@
-﻿@page
-@model IndexModel
+@page
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Advanced Billing System";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
-</div>
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"]</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            color: #1f2937;
+        }
+
+        header {
+            background: #0f766e;
+            color: white;
+            padding: 24px;
+            text-align: center;
+        }
+
+        main {
+            max-width: 1100px;
+            margin: 24px auto;
+            padding: 0 16px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 16px;
+        }
+
+        section {
+            background: white;
+            border: 1px solid #d8dee4;
+            border-radius: 8px;
+            padding: 18px;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+        }
+
+        h1,
+        h2 {
+            margin-top: 0;
+        }
+
+        label {
+            display: block;
+            margin-top: 12px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 10px;
+            margin-top: 6px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        button {
+            margin-top: 16px;
+            width: 100%;
+            border: 0;
+            border-radius: 6px;
+            background: #0f766e;
+            color: white;
+            padding: 11px 14px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #115e59;
+        }
+
+        pre {
+            grid-column: 1 / -1;
+            background: #111827;
+            color: #d1fae5;
+            padding: 16px;
+            border-radius: 8px;
+            overflow: auto;
+            min-height: 120px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Advanced Billing System</h1>
+        <p>Tenant billing, subscriptions, invoices, discounts, and payment lifecycle</p>
+    </header>
+
+    <main>
+        <section>
+            <h2>Create Tenant</h2>
+            <label for="tenantName">Name</label>
+            <input id="tenantName" placeholder="Acme Pvt Ltd" />
+
+            <label for="tenantEmail">Email</label>
+            <input id="tenantEmail" placeholder="billing@acme.com" />
+
+            <button onclick="createTenant()">Create Tenant</button>
+        </section>
+
+        <section>
+            <h2>Plans</h2>
+            <button onclick="loadPlans()">Load Plans</button>
+            <label for="planId">Selected Plan Id</label>
+            <select id="planId"></select>
+        </section>
+
+        <section>
+            <h2>Subscribe Tenant</h2>
+            <label for="tenantIdForSubscription">Tenant Id</label>
+            <input id="tenantIdForSubscription" placeholder="Tenant Guid" />
+
+            <button onclick="subscribeTenant()">Subscribe</button>
+        </section>
+
+        <section>
+            <h2>Generate Invoice</h2>
+            <label for="subscriptionId">Subscription Id</label>
+            <input id="subscriptionId" placeholder="Subscription Guid" />
+
+            <label for="usageUnits">Usage Units</label>
+            <input id="usageUnits" type="number" value="120" />
+
+            <label for="discountType">Discount Type</label>
+            <select id="discountType">
+                <option value="">No Discount</option>
+                <option value="1">Seasonal</option>
+                <option value="2">Volume</option>
+                <option value="3">Coupon</option>
+            </select>
+
+            <label for="discountValue">Discount Value</label>
+            <input id="discountValue" type="number" value="10" />
+
+            <label for="discountThreshold">Volume Threshold</label>
+            <input id="discountThreshold" type="number" value="100" />
+
+            <button onclick="generateInvoice()">Generate Invoice</button>
+        </section>
+
+        <section>
+            <h2>Finalize Invoice</h2>
+            <label for="finalizeInvoiceId">Invoice Id</label>
+            <input id="finalizeInvoiceId" placeholder="Invoice Guid" />
+
+            <button onclick="finalizeInvoice()">Finalize</button>
+        </section>
+
+        <section>
+            <h2>Pay Invoice</h2>
+            <label for="payInvoiceId">Invoice Id</label>
+            <input id="payInvoiceId" placeholder="Invoice Guid" />
+
+            <label for="paymentReference">Reference</label>
+            <input id="paymentReference" value="TXN-1001" />
+
+            <button onclick="payInvoice()">Pay</button>
+        </section>
+
+        <section>
+            <h2>Billing History</h2>
+            <label for="historyTenantId">Tenant Id</label>
+            <input id="historyTenantId" placeholder="Tenant Guid" />
+
+            <button onclick="getBillingHistory()">Get History</button>
+        </section>
+
+        <pre id="output">Output will appear here...</pre>
+    </main>
+
+    <script>
+        const apiBaseUrl = window.location.origin;
+        const output = document.getElementById("output");
+
+        function show(data) {
+            output.textContent = JSON.stringify(data, null, 2);
+        }
+
+        async function send(url, options = {}) {
+            const response = await fetch(apiBaseUrl + url, {
+                headers: { "Content-Type": "application/json" },
+                ...options
+            });
+
+            const text = await response.text();
+            const data = text ? JSON.parse(text) : null;
+
+            if (!response.ok) {
+                throw new Error(data?.title || data?.detail || text || "Request failed");
+            }
+
+            show(data);
+            return data;
+        }
+
+        async function createTenant() {
+            const tenant = await send("/tenants", {
+                method: "POST",
+                body: JSON.stringify({
+                    name: document.getElementById("tenantName").value,
+                    email: document.getElementById("tenantEmail").value
+                })
+            });
+
+            document.getElementById("tenantIdForSubscription").value = tenant.id;
+            document.getElementById("historyTenantId").value = tenant.id;
+        }
+
+        async function loadPlans() {
+            const plans = await send("/plans");
+            const select = document.getElementById("planId");
+            select.innerHTML = "";
+
+            plans.forEach(plan => {
+                const option = document.createElement("option");
+                option.value = plan.id;
+                option.textContent = `${plan.name} (${plan.billingStrategyType})`;
+                select.appendChild(option);
+            });
+        }
+
+        async function subscribeTenant() {
+            const subscription = await send("/subscriptions", {
+                method: "POST",
+                body: JSON.stringify({
+                    tenantId: document.getElementById("tenantIdForSubscription").value,
+                    planId: document.getElementById("planId").value
+                })
+            });
+
+            document.getElementById("subscriptionId").value = subscription.id;
+        }
+
+        async function generateInvoice() {
+            const discountType = document.getElementById("discountType").value;
+            const discounts = discountType
+                ? [{
+                    type: Number(discountType),
+                    value: Number(document.getElementById("discountValue").value),
+                    threshold: Number(document.getElementById("discountThreshold").value)
+                }]
+                : [];
+
+            const invoice = await send("/invoices", {
+                method: "POST",
+                body: JSON.stringify({
+                    subscriptionId: document.getElementById("subscriptionId").value,
+                    usageUnits: Number(document.getElementById("usageUnits").value),
+                    discounts
+                })
+            });
+
+            document.getElementById("finalizeInvoiceId").value = invoice.id;
+            document.getElementById("payInvoiceId").value = invoice.id;
+        }
+
+        async function finalizeInvoice() {
+            await send(`/invoices/${document.getElementById("finalizeInvoiceId").value}/finalize`, {
+                method: "POST"
+            });
+        }
+
+        async function payInvoice() {
+            await send(`/invoices/${document.getElementById("payInvoiceId").value}/pay`, {
+                method: "POST",
+                body: JSON.stringify({
+                    reference: document.getElementById("paymentReference").value
+                })
+            });
+        }
+
+        async function getBillingHistory() {
+            await send(`/tenants/${document.getElementById("historyTenantId").value}/billing-history`);
+        }
+
+        window.addEventListener("unhandledrejection", event => {
+            output.textContent = event.reason.message;
+        });
+    </script>
+</body>
+</html>
